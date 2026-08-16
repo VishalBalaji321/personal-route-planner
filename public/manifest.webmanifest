@@ -1,0 +1,9 @@
+{
+  "name": "VB Transit Arcade",
+  "short_name": "VB Transit",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1220",
+  "theme_color": "#0f1220",
+  "icons": []
+}
