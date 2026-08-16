@@ -416,15 +416,13 @@ function renderSavedPlaces() {
     row.appendChild(station);
 
     if (p.isHome) {
-      const star = el("span", "pr-star on", "★");
-      star.setAttribute("aria-label", "Not home");
-      star.addEventListener("click", (e) => { e.stopPropagation(); toggleHome(p.id); });
-      row.appendChild(star);
+      row.appendChild(el("span", "set-home is-home", "HOME"));
     } else {
-      const star = el("span", "pr-star", "☆");
-      star.setAttribute("aria-label", "Mark as home");
-      star.addEventListener("click", (e) => { e.stopPropagation(); toggleHome(p.id); });
-      row.appendChild(star);
+      const btn = el("button", "set-home", "SET HOME");
+      btn.setAttribute("aria-label", `Set ${p.name} as home`);
+      btn.title = "Set as home - enables bike options";
+      btn.addEventListener("click", (e) => { e.stopPropagation(); setHome(p.id); });
+      row.appendChild(btn);
     }
 
     const del = el("span", "pr-del", "X");
@@ -445,12 +443,15 @@ function selectPlace(id) {
   load();
 }
 
-function toggleHome(id) {
+function setHome(id) {
   const p = placeById(id);
-  if (!p) return;
-  p.isHome = !p.isHome;
+  if (!p || p.isHome) return;
+  for (const other of state.places) if (other.id !== id) other.isHome = false;
+  p.isHome = true;
   savePlaces();
   renderSavedPlaces();
+  renderRouteButtons();
+  load();
 }
 
 function deletePlace(id) {

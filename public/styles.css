@@ -278,7 +278,7 @@ button { -webkit-tap-highlight-color: transparent; }
   text-transform: uppercase;
   white-space: nowrap;
 }
-.pr-home, .pr-star, .pr-del {
+.pr-home, .pr-del {
   flex: none;
   font-family: var(--font-pixel);
   font-size: 8px;
@@ -292,8 +292,25 @@ button { -webkit-tap-highlight-color: transparent; }
   font-size: 17px;
   text-transform: uppercase;
 }
-.pr-star { padding: 4px; color: var(--dim); cursor: pointer; }
-.pr-star.on { color: var(--yellow); }
+.set-home {
+  flex: none;
+  padding: 5px 8px;
+  border: 2px solid #000;
+  background: var(--panel-2);
+  color: var(--yellow);
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.set-home:hover { color: var(--green); }
+.set-home.is-home {
+  background: var(--green);
+  color: var(--bg);
+  cursor: default;
+  pointer-events: none;
+}
 .pr-del { padding: 4px; color: var(--red); cursor: pointer; }
 
 
