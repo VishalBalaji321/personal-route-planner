@@ -2,7 +2,7 @@
 
 A personal commute router for Munich. Combines **realtime MVV transit** (EFA) with **Open-Meteo weather** to recommend the fastest door-to-door option between two freely chosen places, including "bike to the station" and "bike all the way" options when the weather allows.
 
-Live: **https://personal-route-planner.vishalvichu45.workers.dev**
+Live: **https://personal-route-planner.vishalvichu45.workers.dev** · Source: **https://github.com/VishalBalaji321/personal-route-planner**
 
 ## Features
 
