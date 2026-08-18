@@ -4,7 +4,7 @@ Guidance for AI agents (and future humans) working on this repo. Read this befor
 
 ## What this is
 
-**VB Transit Arcade** — a personal commute router for Munich, deployed as a free-tier Cloudflare Worker. It combines realtime MVV transit (EFA) with Open-Meteo weather to recommend the fastest door-to-door option between two freely chosen places, including "bike to the station" and "bike all the way" options when the weather allows.
+**RadlDash MUC** — a personal commute router for Munich, deployed as a free-tier Cloudflare Worker. It combines realtime MVV transit (EFA) with Open-Meteo weather to recommend the fastest door-to-door option between two freely chosen places, including "bike to the station" and "bike all the way" options when the weather allows.
 
 Live URL: **https://personal-route-planner.vishalvichu45.workers.dev**
 
@@ -85,7 +85,7 @@ SSH_AUTH_SOCK=$(ls /tmp/ssh-*/agent.* | head -1) git push origin main
 
 ## User preferences captured along the way
 
-- Title: "VB Transit Arcade". Route labels: "Home", "BMW Garching", "BMW FIZ".
+- Title: "RadlDash MUC". Route labels: "Home", "BMW Garching", "BMW FIZ".
 - Settings (user-local, in `localStorage` under `commute:settings`): max bike time (default 20 min), depart "now" vs specific time (stale past times reset to "now").
 - Saved commutes (`commute:saved`): one-tap route presets shown as chips; save button next to the route picker.
 - Footer: "Made by Vishal Balaji" linking to the GitHub repo.
