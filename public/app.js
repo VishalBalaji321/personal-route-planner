@@ -158,12 +158,12 @@ function shortDotText(leg) {
   return p.slice(0, 1).toUpperCase();
 }
 
-function renderWeather(w, travelMode) {
+function renderWeather(w, travelMode, fromName) {
   const box = $("#weather");
   box.classList.remove("hidden");
   box.innerHTML = "";
 
-  box.appendChild(el("div", "w-kicker", "Now in Munich"));
+  box.appendChild(el("div", "w-kicker", `Now at ${fromName || "your location"}`));
 
   const reading = el("div", "w-reading");
   reading.appendChild(el("span", "w-temp", `${Math.round(w.tempNow)}C`));
@@ -861,7 +861,7 @@ function readOffline() {
 function render() {
   const data = state.offlineData || state.data;
   if (!data) return;
-  if (data.weather) renderWeather(data.weather, data.travelMode);
+  if (data.weather) renderWeather(data.weather, data.travelMode, data.fromName);
 
   const updated = $("#updated");
   if (data._stale) {
