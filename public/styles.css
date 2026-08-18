@@ -137,6 +137,7 @@ button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
   align-items: flex-start;
   gap: 4px;
   min-height: 58px;
+  min-width: 0;
   padding: 12px;
   border: 3px solid #000;
   background: var(--panel);
@@ -193,14 +194,11 @@ button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 
 .saved-commutes {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   align-items: center;
   margin: 0 0 18px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  scrollbar-width: none;
 }
-.saved-commutes::-webkit-scrollbar { display: none; }
 
 .sc-save {
   flex: none;
@@ -808,6 +806,20 @@ button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
   text-decoration: none;
 }
 .made a:active { color: var(--green); }
+
+@media (max-width: 520px) {
+  .route-pick {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "from"
+      "swap"
+      "to";
+    gap: 10px;
+  }
+  #from-btn { grid-area: from; }
+  #swap-btn { grid-area: swap; justify-self: center; }
+  #to-btn { grid-area: to; }
+}
 
 @media (max-width: 380px) {
   body { padding-right: 12px; padding-left: 12px; }
