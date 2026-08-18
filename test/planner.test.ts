@@ -207,6 +207,48 @@ describe("planCommute", () => {
     expect(home?.stations[0].stopId).toBe("91000300");
   });
 
+  it("forces bike options in bike mode even when weather blocks biking", async () => {
+    const trips = tripsFrom("efa_trip_moosach_amhart.json");
+    const res = await planCommute(homeSpec, work2Spec, now, badWeather, {
+      maxBikeMinutes: 60,
+      travelMode: "bike",
+      fetchTrips: async () => trips,
+    });
+    expect(res.options.length).toBeGreaterThan(0);
+    // Every option uses the bike at the origin (no walk-access transit).
+    for (const o of res.options) {
+      if (o.kind === "bike") continue;
+      expect(o.kind).toBe("transit");
+      expect(o.originAccess.mode).toBe("bike");
+    }
+    expect(res.options.some((o) => o.kind === "bike")).toBe(true);
+  });
+
+  it("hides all bike options in transit mode", async () => {
+    const trips = tripsFrom("efa_trip_moosach_amhart.json");
+    const res = await planCommute(homeSpec, work2Spec, now, goodWeather, {
+      maxBikeMinutes: 60,
+      travelMode: "transit",
+      fetchTrips: async () => trips,
+    });
+    expect(res.options.length).toBeGreaterThan(0);
+    for (const o of res.options) {
+      expect(o.kind).toBe("transit");
+      expect(o.originAccess.mode).toBe("walk");
+      expect(o.egress.mode).toBe("walk");
+    }
+  });
+
+  it("offers nothing in bike mode from a non-home origin (HOME rule kept)", async () => {
+    const trips = tripsFrom("efa_trip_amhart_moosach.json");
+    const res = await planCommute(work2Spec, homeSpec, now, goodWeather, {
+      maxBikeMinutes: 60,
+      travelMode: "bike",
+      fetchTrips: async () => trips,
+    });
+    expect(res.options.length).toBe(0);
+  });
+
   it("computes access times from distance", () => {
     // ~1 km at 4.8 km/h with 1.3 detour ≈ 16 min
     expect(walkMinutesFor(1000)).toBeGreaterThanOrEqual(15);

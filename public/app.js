@@ -39,12 +39,14 @@ const SEED_PLACES = [
   },
 ];
 
-const DEFAULT_SETTINGS = { maxBikeMinutes: 20, useStart: false, startValue: "" };
+const DEFAULT_SETTINGS = { maxBikeMinutes: 20, useStart: false, startValue: "", travelMode: "auto" };
 
 const ACCESS_LABEL = { walk: "Walk", bike: "Bike" };
+const MODE_LABEL = { auto: "Auto", bike: "Bike forced", transit: "Transit only" };
 
 const state = {
   places: [],
+  gpsPlace: null,
   route: { fromId: null, toId: null },
   savedCommutes: [],
   pickerSide: "from",
@@ -114,6 +116,7 @@ const el = (tag, cls, text) => {
 };
 
 function placeById(id) {
+  if (id === "gps" && state.gpsPlace) return state.gpsPlace;
   return state.places.find((p) => p.id === id);
 }
 
@@ -155,7 +158,7 @@ function shortDotText(leg) {
   return p.slice(0, 1).toUpperCase();
 }
 
-function renderWeather(w) {
+function renderWeather(w, travelMode) {
   const box = $("#weather");
   box.classList.remove("hidden");
   box.innerHTML = "";
@@ -167,10 +170,14 @@ function renderWeather(w) {
   reading.appendChild(el("span", "w-feels", `feels ${Math.round(w.apparentTempNow)}C`));
   box.appendChild(reading);
 
+  const forcedBike = travelMode === "bike" && !w.bikeAllowed;
   const verdict = el("div", "w-verdict");
-  if (w.bikeAllowed) {
+  if (w.bikeAllowed && !forcedBike) {
     verdict.textContent = "Bike friendly";
     verdict.className = "w-verdict good";
+  } else if (forcedBike) {
+    verdict.textContent = "Bike forced - weather is rough!";
+    verdict.className = "w-verdict warn";
   } else if (w.blockedBy.includes("rain") && w.blockedBy.includes("cold")) {
     verdict.textContent = "Too cold and rainy to bike";
     verdict.className = "w-verdict bad";
@@ -196,7 +203,11 @@ function renderOptions(data) {
   box.innerHTML = "";
 
   if (data.options.length === 0) {
-    box.appendChild(el("p", "loading", "No transit/bike options right now."));
+    if (data.travelMode === "bike") {
+      box.appendChild(el("p", "loading", "No bike options - origin must be HOME"));
+    } else {
+      box.appendChild(el("p", "loading", "No transit/bike options right now."));
+    }
     return;
   }
 
@@ -378,16 +389,25 @@ function renderRouteButtons() {
   $("#to-btn").innerHTML = "";
   $("#from-btn").appendChild(el("span", "pb-label", "from"));
   $("#from-btn").appendChild(el("span", "pb-name", from ? from.name : "Choose"));
+  if (state.route.fromId === "gps" && from) appendGpsTag($("#from-btn"));
   $("#to-btn").appendChild(el("span", "pb-label", "to"));
   $("#to-btn").appendChild(el("span", "pb-name", to ? to.name : "Choose"));
+  if (state.route.toId === "gps" && to) appendGpsTag($("#to-btn"));
+}
+
+function appendGpsTag(btn) {
+  btn.appendChild(el("span", "gps-tag", "GPS"));
 }
 
 function openPicker(side) {
   state.pickerSide = side;
+  document.body.classList.add("sheet-open");
   $("#picker-title").textContent = side === "from" ? "Start" : "Destination";
   $("#picker-search").value = "";
   $("#picker-results").classList.add("hidden");
   $("#picker-results").innerHTML = "";
+  $("#gps-status").classList.add("hidden");
+  $("#gps-status").textContent = "";
   renderSavedPlaces();
   $("#picker-sheet").classList.remove("hidden");
   $("#settings-overlay").classList.remove("hidden");
@@ -396,6 +416,7 @@ function openPicker(side) {
 function closePicker() {
   $("#picker-sheet").classList.add("hidden");
   $("#settings-overlay").classList.add("hidden");
+  document.body.classList.remove("sheet-open");
 }
 
 function renderSavedPlaces() {
@@ -644,6 +665,119 @@ async function resolveStations(lat, lon) {
   }
 }
 
+// ---------------------------------------------------------------- GPS location
+
+function setGpsStatus(msg, isError) {
+  const s = $("#gps-status");
+  s.textContent = msg;
+  s.classList.toggle("hidden", !msg);
+  s.classList.toggle("gps-error", Boolean(isError));
+}
+
+function gpsErrorText(code) {
+  if (code === 1) return "Location permission denied - allow it in your browser";
+  if (code === 2) return "Location unavailable - try again";
+  if (code === 3) return "Location timed out - check GPS and try again";
+  return "Couldn't get your location";
+}
+
+function useCurrentLocation() {
+  const btn = $("#picker-gps");
+  btn.disabled = true;
+  setGpsStatus("Locating...");
+  if (!("geolocation" in navigator)) {
+    btn.disabled = false;
+    setGpsStatus("GPS not supported on this device", true);
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      try {
+        const { latitude: lat, longitude: lon } = pos.coords;
+        setGpsStatus("Finding nearby stations...");
+        const [revRes, stRes] = await Promise.all([
+          fetch(`/api/reverse?lat=${lat}&lon=${lon}`),
+          fetch(`/api/stations?lat=${lat}&lon=${lon}`),
+        ]);
+        const rev = await revRes.json().catch(() => ({}));
+        const st = await stRes.json().catch(() => ({ stations: [] }));
+        const stations = st.stations || [];
+        if (stations.length === 0) {
+          setGpsStatus("No nearby MVV stations found", true);
+          return;
+        }
+        state.gpsPlace = {
+          id: "gps",
+          name: (rev.name || "Current location").slice(0, 60),
+          address: "",
+          lat,
+          lon,
+          isHome: false,
+          stations,
+        };
+        selectPlace("gps");
+      } catch {
+        setGpsStatus("Couldn't resolve location", true);
+      } finally {
+        btn.disabled = false;
+      }
+    },
+    (err) => {
+      btn.disabled = false;
+      setGpsStatus(gpsErrorText(err && err.code), true);
+    },
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 },
+  );
+}
+
+/** Re-fix the GPS position if the route references it (silent on failure). */
+async function refreshGpsIfNeeded() {
+  if (state.route.fromId !== "gps" && state.route.toId !== "gps") return;
+  if (!("geolocation" in navigator)) {
+    fallbackFromGps();
+    return;
+  }
+  try {
+    const pos = await new Promise((resolve, reject) =>
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      }),
+    );
+    const { latitude: lat, longitude: lon } = pos.coords;
+    const [revRes, stRes] = await Promise.all([
+      fetch(`/api/reverse?lat=${lat}&lon=${lon}`),
+      fetch(`/api/stations?lat=${lat}&lon=${lon}`),
+    ]);
+    const rev = await revRes.json().catch(() => ({}));
+    const st = await stRes.json().catch(() => ({ stations: [] }));
+    const stations = st.stations || [];
+    if (stations.length === 0) {
+      fallbackFromGps();
+      return;
+    }
+    state.gpsPlace = {
+      id: "gps",
+      name: (rev.name || "Current location").slice(0, 60),
+      address: "",
+      lat,
+      lon,
+      isHome: false,
+      stations,
+    };
+  } catch {
+    fallbackFromGps();
+  }
+}
+
+function fallbackFromGps() {
+  state.gpsPlace = null;
+  if (state.route.fromId === "gps") state.route.fromId = state.places[0]?.id ?? null;
+  if (state.route.toId === "gps") state.route.toId = state.places.find((p) => p.id !== state.route.fromId)?.id ?? state.places[1]?.id ?? null;
+  saveRoute();
+}
+
 function addPlaceAndSelect(place) {
   // Dedupe: if a place with the same primary stop exists, select it instead.
   const existing = state.places.find((p) => p.stations[0]?.stopId === place.stations[0]?.stopId);
@@ -675,6 +809,7 @@ async function load() {
     from,
     to,
     maxBikeMinutes: state.settings.maxBikeMinutes,
+    travelMode: state.settings.travelMode,
   };
   if (state.settings.useStart && state.settings.startValue) {
     body.start = new Date(state.settings.startValue).toISOString();
@@ -726,7 +861,7 @@ function readOffline() {
 function render() {
   const data = state.offlineData || state.data;
   if (!data) return;
-  if (data.weather) renderWeather(data.weather);
+  if (data.weather) renderWeather(data.weather, data.travelMode);
 
   const updated = $("#updated");
   if (data._stale) {
@@ -743,13 +878,20 @@ function render() {
 
 function renderPrefs(data) {
   const prefs = $("#prefs");
+  const chips = [];
   if (data.maxBikeMinutes && data.maxBikeMinutes !== 20) {
-    prefs.classList.remove("hidden");
-    prefs.innerHTML = "";
-    prefs.appendChild(el("span", "chip", `Max bike ${data.maxBikeMinutes} min`));
-  } else {
+    chips.push(`Max bike ${data.maxBikeMinutes} min`);
+  }
+  if (data.travelMode && data.travelMode !== "auto") {
+    chips.push(MODE_LABEL[data.travelMode] || data.travelMode);
+  }
+  if (chips.length === 0) {
     prefs.classList.add("hidden");
     prefs.innerHTML = "";
+  } else {
+    prefs.classList.remove("hidden");
+    prefs.innerHTML = "";
+    chips.forEach((c) => prefs.appendChild(el("span", "chip", c)));
   }
 }
 
@@ -802,7 +944,7 @@ function initDepart() {
       ? state.settings.startValue
       : defaultStartValue();
     setDepart(true, v);
-    $("#depart-input").showPicker && $("#depart-input").showPicker();
+    try { $("#depart-input").showPicker && $("#depart-input").showPicker(); } catch {}
   });
   $("#depart-input").addEventListener("change", () => {
     if ($("#depart-input").value) {
@@ -813,6 +955,7 @@ function initDepart() {
 }
 
 function openSettings() {
+  document.body.classList.add("sheet-open");
   $("#max-bike").value = state.settings.maxBikeMinutes;
   $("#settings-sheet").classList.remove("hidden");
   $("#settings-overlay").classList.remove("hidden");
@@ -820,6 +963,7 @@ function openSettings() {
 function closeSettings() {
   $("#settings-sheet").classList.add("hidden");
   $("#settings-overlay").classList.add("hidden");
+  document.body.classList.remove("sheet-open");
 }
 function saveSettingsFromForm() {
   const max = Math.min(240, Math.max(1, Math.round(Number($("#max-bike").value) || DEFAULT_SETTINGS.maxBikeMinutes)));
@@ -830,6 +974,7 @@ function saveSettingsFromForm() {
 function resetSettings() {
   saveSettings({ ...DEFAULT_SETTINGS });
   setDepart(false, "");
+  setTravelMode("auto");
   closeSettings();
   load();
 }
@@ -839,6 +984,24 @@ function initSettings() {
   $("#settings-close").addEventListener("click", closeSettings);
   $("#settings-save").addEventListener("click", saveSettingsFromForm);
   $("#settings-reset").addEventListener("click", resetSettings);
+}
+
+// ---------------------------------------------------------------- travel mode
+
+function setTravelMode(mode) {
+  saveSettings({ ...state.settings, travelMode: mode });
+  ["auto", "bike", "transit"].forEach((m) => {
+    const btn = $(`#mode-${m}`);
+    btn.classList.toggle("active", m === mode);
+    btn.setAttribute("aria-pressed", String(m === mode));
+  });
+}
+
+function initMode() {
+  setTravelMode(state.settings.travelMode || "auto");
+  $("#mode-auto").addEventListener("click", () => { setTravelMode("auto"); load(); });
+  $("#mode-bike").addEventListener("click", () => { setTravelMode("bike"); load(); });
+  $("#mode-transit").addEventListener("click", () => { setTravelMode("transit"); load(); });
 }
 
 // ---------------------------------------------------------------- init
@@ -854,12 +1017,14 @@ function init() {
   renderRouteButtons();
   renderSavedCommutes();
   initDepart();
+  initMode();
   initSettings();
 
   $("#from-btn").addEventListener("click", () => openPicker("from"));
   $("#to-btn").addEventListener("click", () => openPicker("to"));
   $("#swap-btn").addEventListener("click", swapRoute);
   $("#picker-close").addEventListener("click", closePicker);
+  $("#picker-gps").addEventListener("click", useCurrentLocation);
   $("#settings-overlay").addEventListener("click", () => { closePicker(); closeSettings(); });
   $("#picker-search").addEventListener("input", onSearchInput);
   document.getElementById("refresh").addEventListener("click", load);
@@ -868,7 +1033,10 @@ function init() {
     if (e.key === "Escape") { closePicker(); closeSettings(); }
   });
 
-  load();
+  refreshGpsIfNeeded().then(() => {
+    renderRouteButtons();
+    load();
+  });
 }
 
 init();

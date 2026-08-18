@@ -13,6 +13,7 @@ import type {
   Leg,
   PlaceSpec,
   TransitLeg,
+  TravelMode,
   WeatherSnapshot,
 } from "./types";
 
@@ -21,6 +22,8 @@ export type TripFetcher = (opts: EfaFetchOptions) => Promise<EfaTrip[]>;
 export interface PlanOptions {
   /** Cap on total biking minutes per option; longer bike options are dropped. */
   maxBikeMinutes?: number;
+  /** "auto" (weather decides) | "bike" (force bike) | "transit" (no bike). */
+  travelMode?: TravelMode;
   /** Injectable trip fetcher (for tests). */
   fetchTrips?: TripFetcher;
 }
@@ -68,6 +71,12 @@ export function placeCoords(p: PlaceSpec): { lat: number; lon: number } | null {
  * - bike-to-station at the origin for any station > MIN_BIKE_TO_STATION_METERS
  * - bike egress only when the destination place is marked home
  * - full end-to-end bike only when the origin place is marked home
+ *
+ * Travel modes:
+ * - "auto": bike options appear when the weather verdict allows
+ * - "bike": bike options always appear (even in bad weather); walk-only
+ *   transit options are hidden so every option uses the bike
+ * - "transit": no bike options at all
  */
 export async function planCommute(
   from: PlaceSpec,
@@ -80,20 +89,29 @@ export async function planCommute(
   const options: CommuteOption[] = [];
 
   const maxBikeMinutes = opts.maxBikeMinutes ?? DEFAULT_MAX_BIKE_MINUTES;
+  const travelMode = opts.travelMode ?? "auto";
   const fetchTrips = opts.fetchTrips ?? fetchEfaTrips;
+  const bikeAllowed =
+    travelMode === "transit" ? false : weather.bikeAllowed || travelMode === "bike";
 
   for (const originStation of from.stations) {
     const accessModes: AccessInfo[] = [{ mode: "walk", minutes: originStation.walkMin }];
     if (
       from.isHome &&
-      weather.bikeAllowed &&
+      bikeAllowed &&
       originStation.distanceMeters > MIN_BIKE_TO_STATION_METERS &&
       originStation.bikeMin <= maxBikeMinutes
     ) {
       accessModes.push({ mode: "bike", minutes: originStation.bikeMin });
     }
 
-    for (const access of accessModes) {
+    // In bike mode every option must start on the bike.
+    const effectiveAccess =
+      travelMode === "bike"
+        ? accessModes.filter((a) => a.mode === "bike")
+        : accessModes;
+
+    for (const access of effectiveAccess) {
       const leaveEarliest = addMinutes(now, access.minutes);
 
       for (const destStation of to.stations) {
@@ -123,7 +141,7 @@ export async function planCommute(
           const egressModes: AccessInfo[] = [{ mode: "walk", minutes: destStation.walkMin }];
           if (
             to.isHome &&
-            weather.bikeAllowed &&
+            bikeAllowed &&
             destStation.distanceMeters > MIN_BIKE_TO_STATION_METERS &&
             destStation.bikeMin <= maxBikeMinutes
           ) {
@@ -158,7 +176,7 @@ export async function planCommute(
   const toCoords = placeCoords(to);
   if (
     from.isHome &&
-    weather.bikeAllowed &&
+    bikeAllowed &&
     coords &&
     toCoords
   ) {
@@ -208,6 +226,7 @@ export function buildResponse(
   queryFor: Date,
   startTime: string | null,
   maxBikeMinutes: number,
+  travelMode: TravelMode,
   weather: WeatherSnapshot,
   options: CommuteOption[],
   errors: string[],
@@ -217,6 +236,7 @@ export function buildResponse(
     queryFor: queryFor.toISOString(),
     startTime,
     maxBikeMinutes,
+    travelMode,
     from: from.id,
     to: to.id,
     fromName: from.name,

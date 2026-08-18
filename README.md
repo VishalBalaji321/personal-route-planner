@@ -12,6 +12,8 @@ Live: **https://personal-route-planner.vishalvichu45.workers.dev** · Source: **
 - **Saved commutes** — save the current route as a one-tap preset chip; saved places with a "home" flag
 - Realtime MVV departures with live delays (no cached schedules)
 - Weather-based bike verdict: temp ≥ 5°C, rain probability < 40%, ≤ 0.1 mm over the next 2 hours
+- **Travel mode switch** — `Auto` (weather decides) / `Bike` (force bike in any weather) / `Transit` (no bike at all)
+- **GPS current location** — ephemeral start/destination fixed from the browser's location (never stored), auto-refreshed on load
 - Bike-to-station (only if > 600 m) and full-bike (only from a place marked "home"), capped by a "max bike time" setting
 - Options ranked by arrival time; leg-by-leg timeline with **change-hub highlighting**, platforms and delays
 - Depart "now" or at a specific time (stale times reset to the user's current time)
@@ -35,7 +37,8 @@ Live: **https://personal-route-planner.vishalvichu45.workers.dev** · Source: **
 GET  /api/search?q=<text>                       stations (EFA) + places + addresses
 GET  /api/stations?lat=<lat>&lon=<lon>          nearest EFA stations (for a new place)
 GET  /api/station?stopId=<id>                   name + coords for a stop id
-POST /api/commute  {"from": PlaceSpec, "to": PlaceSpec, "maxBikeMinutes": n, "start": ISO}
+GET  /api/reverse?lat=<lat>&lon=<lon>           short name for a coordinate (GPS location)
+POST /api/commute  {"from": PlaceSpec, "to": PlaceSpec, "maxBikeMinutes": n, "travelMode": "auto"|"bike"|"transit", "start": ISO}
 GET  /api/health
 ```
 

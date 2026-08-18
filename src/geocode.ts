@@ -5,9 +5,7 @@ export interface GeocodeResult {
   lat: number;
   lon: number;
   country?: string;
-}
-
-/** Open-Meteo geocoding — resolves cities, towns and named places. */
+}/** Open-Meteo geocoding — resolves cities, towns and named places. */
 export async function geocode(q: string, limit = 6): Promise<GeocodeResult[]> {
   const params = new URLSearchParams({
     name: q,
@@ -65,4 +63,41 @@ export async function nominatim(q: string, limit = 4): Promise<GeocodeResult[]> 
     out.push({ name: short.slice(0, 90), lat, lon });
   }
   return out;
+}
+
+interface ReverseAddress {
+  road?: string;
+  house_number?: string;
+  suburb?: string;
+  city?: string;
+  town?: string;
+  village?: string;
+  municipality?: string;
+  state?: string;
+}
+
+/** Short human label for a Nominatim reverse address. */
+export function shortReverseLabel(a: ReverseAddress): string | null {
+  const road = a.road || a.house_number;
+  const locality = a.suburb || a.town || a.village || a.city || a.municipality;
+  const parts = [road, locality].filter(Boolean);
+  const out = (parts.length ? parts.join(", ") : a.state || "").trim();
+  return out ? out.slice(0, 90) : null;
+}
+
+/**
+ * Nominatim reverse geocoding — short name for a WGS84 coordinate
+ * (e.g. the GPS "current location"). Returns null when nothing usable.
+ */
+export async function reverseGeocode(
+  lat: number,
+  lon: number,
+): Promise<string | null> {
+  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=16&lat=${lat}&lon=${lon}`;
+  const res = await fetch(url, {
+    headers: { "user-agent": "vishal-commute-pro-max (personal commute app)" },
+  });
+  if (!res.ok) throw new Error(`nominatim reverse returned HTTP ${res.status}`);
+  const data = (await res.json()) as { address?: ReverseAddress; display_name?: string };
+  return shortReverseLabel(data.address ?? {}) ?? data.display_name?.slice(0, 90) ?? null;
 }

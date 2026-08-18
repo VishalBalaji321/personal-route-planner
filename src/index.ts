@@ -4,10 +4,13 @@ import { nearestStations, type Bindings } from "./stations";
 import { searchPlaces } from "./search";
 import { stopInfo } from "./efa";
 import { planCommute, buildResponse, placeCoords } from "./planner";
+import { reverseGeocode } from "./geocode";
 import { fetchWeather, computeWeather } from "./weather";
-import type { CommuteRequest, PlaceSpec } from "./types";
+import type { CommuteRequest, PlaceSpec, TravelMode } from "./types";
 
 const app = new Hono();
+
+const TRAVEL_MODES: ReadonlyArray<TravelMode> = ["auto", "bike", "transit"];
 
 function asBindings(env: unknown): Bindings {
   return env as Bindings;
@@ -112,6 +115,21 @@ app.get("/api/stations", async (c) => {
   }
 });
 
+/** Reverse geocode a coordinate to a short place name (for GPS location). */
+app.get("/api/reverse", async (c) => {
+  const lat = Number(c.req.query("lat"));
+  const lon = Number(c.req.query("lon"));
+  if (!isFiniteNum(lat) || !isFiniteNum(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+    return c.json({ error: "Missing or invalid lat/lon" }, 400);
+  }
+  try {
+    const name = await reverseGeocode(lat, lon);
+    return c.json({ name });
+  } catch (err) {
+    return c.json({ error: (err as Error).message }, 502);
+  }
+});
+
 /** Compute the best commute options between two resolved places. */
 app.post("/api/commute", async (c) => {
   const serverNow = new Date();
@@ -148,6 +166,10 @@ app.post("/api/commute", async (c) => {
       ? Math.round(maxBikeRaw)
       : DEFAULT_MAX_BIKE_MINUTES;
 
+  const travelMode: TravelMode = TRAVEL_MODES.includes(body?.travelMode as TravelMode)
+    ? (body.travelMode as TravelMode)
+    : "auto";
+
   const errors: string[] = [];
   const coords = placeCoords(from) ?? { lat: 48.1374, lon: 11.5755 }; // Munich center fallback
   let weather;
@@ -162,11 +184,12 @@ app.post("/api/commute", async (c) => {
 
   const { options, errors: planErrors } = await planCommute(from, to, start, weather, {
     maxBikeMinutes,
+    travelMode,
   });
   errors.push(...planErrors);
 
   return c.json(
-    buildResponse(from, to, serverNow, start, startTime, maxBikeMinutes, weather, options, errors),
+    buildResponse(from, to, serverNow, start, startTime, maxBikeMinutes, travelMode, weather, options, errors),
   );
 });
 

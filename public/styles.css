@@ -66,9 +66,10 @@ body {
   margin: 0 auto;
   padding: 0 16px calc(40px + var(--safe-bottom));
 }
+body.sheet-open { overflow: hidden; }
 
 button, input { font: inherit; color: inherit; }
-button { -webkit-tap-highlight-color: transparent; }
+button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 
 /* ---------------------------------------------------------------- top */
 
@@ -163,6 +164,17 @@ button { -webkit-tap-highlight-color: transparent; }
   white-space: nowrap;
   max-width: 100%;
 }
+.gps-tag {
+  margin-top: 6px;
+  align-self: flex-end;
+  padding: 3px 8px;
+  border: 2px solid var(--cyan);
+  color: var(--cyan);
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
 
 .swap-btn {
   display: grid;
@@ -209,6 +221,7 @@ button { -webkit-tap-highlight-color: transparent; }
   align-items: center;
   gap: 8px;
   flex: none;
+  min-height: 44px;
   padding: 9px 12px;
   border: 3px solid #000;
   background: var(--panel);
@@ -220,7 +233,7 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 .sc-chip.active { border-color: var(--cyan); color: var(--cyan); }
 .sc-name { white-space: nowrap; }
-.sc-del { color: var(--red); font-size: 15px; padding: 2px; }
+.sc-del { color: var(--red); font-size: 15px; padding: 8px 10px; margin: -8px -10px; }
 
 
 /* ---------------------------------------------------------------- picker sheet */
@@ -236,6 +249,36 @@ button { -webkit-tap-highlight-color: transparent; }
   box-shadow: 3px 3px 0 0 #000;
 }
 .search-input::placeholder { color: var(--dim); }
+
+.gps-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 3px solid #000;
+  background: var(--panel-2);
+  color: var(--cyan);
+  font-size: 21px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  box-shadow: 4px 4px 0 0 #000;
+  cursor: pointer;
+}
+.gps-btn:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 0 #000; }
+.gps-btn:disabled { opacity: 0.6; cursor: default; transform: none; box-shadow: 4px 4px 0 0 #000; }
+
+.gps-status {
+  margin: -6px 0 14px;
+  color: var(--yellow);
+  font-size: 19px;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+.gps-status.gps-error { color: var(--red); }
 
 .picker-results {
   margin-top: 14px;
@@ -294,7 +337,7 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 .set-home {
   flex: none;
-  padding: 5px 8px;
+  padding: 10px 12px;
   border: 2px solid #000;
   background: var(--panel-2);
   color: var(--yellow);
@@ -311,7 +354,7 @@ button { -webkit-tap-highlight-color: transparent; }
   cursor: default;
   pointer-events: none;
 }
-.pr-del { padding: 4px; color: var(--red); cursor: pointer; }
+.pr-del { padding: 10px 12px; color: var(--red); cursor: pointer; }
 
 
 /* ---------------------------------------------------------------- depart */
@@ -367,6 +410,16 @@ button { -webkit-tap-highlight-color: transparent; }
   font-size: 19px;
   text-transform: uppercase;
   box-shadow: 3px 3px 0 0 #000;
+}
+
+/* ---------------------------------------------------------------- mode */
+
+.mode-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: -6px 0 20px;
+  flex-wrap: wrap;
 }
 
 /* ---------------------------------------------------------------- weather */
@@ -656,7 +709,10 @@ button { -webkit-tap-highlight-color: transparent; }
   bottom: 0;
   left: 0;
   z-index: 50;
+  display: flex;
+  flex-direction: column;
   max-width: 640px;
+  max-height: min(86dvh, 100%);
   margin: 0 auto;
   padding: 22px 18px calc(26px + var(--safe-bottom));
   border: 3px solid #000;
@@ -667,9 +723,14 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 @keyframes sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
-.sheet-head { display: flex; align-items: center; justify-content: space-between; }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; flex: none; }
 .sheet-head h2 { margin: 0; color: var(--green); font-family: var(--font-pixel); font-size: 16px; text-transform: uppercase; }
-.sheet-body { margin-top: 22px; }
+.sheet-body {
+  margin-top: 22px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+}
 
 .field label {
   display: block;
@@ -756,4 +817,15 @@ button { -webkit-tap-highlight-color: transparent; }
   .opt-arrival { font-size: 15px; }
   .tab { font-size: 20px; }
   .w-temp { font-size: 36px; }
+  .place-row { flex-wrap: wrap; }
+  .pr-station { display: none; }
+  .depart { flex-wrap: wrap; }
+  .depart-input { min-width: 100%; order: 3; }
+}
+
+@media (max-width: 340px) {
+  .place-btn { padding: 10px; }
+  .pb-name { font-size: 20px; }
+  .opt-title { font-size: 20px; }
+  .opt-total .big { font-size: 13px; }
 }

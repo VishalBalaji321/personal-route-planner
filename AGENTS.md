@@ -12,6 +12,7 @@ Live URL: **https://personal-route-planner.vishalvichu45.workers.dev**
 
 - **No personal data is committed to the repo.** Places (names, addresses, coordinates, chosen stations) live in the user's browser (`localStorage`, key `commute:places`) and are sent to the API per request. The repo only holds a generic seed (`SEED_PLACES` in `src/config.ts`) with public transit stations — no street addresses, no home coordinates.
 - The Worker is stateless (no KV/D1/DO): place data is used transiently for a request and never stored server-side.
+- GPS "current location" is an **ephemeral** place (`id: "gps"`, in-memory only, never written to `commute:places`); it is re-fixed from the browser on load and dropped on failure.
 - Default seed (first run): Home (station Moosach Bf `91000300`), BMW Garching (Carl-von-Linde `1002009`, Voithstraße `1002012`), BMW FIZ (Am Hart `91000760`).
 - **This repo is PUBLIC.** History was rewritten to purge the one commit that contained personal addresses. Never commit addresses, coordinates of private locations, or personal routines — keep anything like that in browser `localStorage` only.
 
@@ -51,7 +52,8 @@ SSH_AUTH_SOCK=$(ls /tmp/ssh-*/agent.* | head -1) git push origin main
   - `GET /api/search?q=` → stations (EFA), places (Open-Meteo), addresses (Nominatim).
   - `GET /api/stations?lat=&lon=` → nearest EFA stations with access times (for setting up a new place).
   - `GET /api/station?stopId=` → name + coords for a stop id.
-  - `POST /api/commute` body `{ from: PlaceSpec, to: PlaceSpec, maxBikeMinutes?, start? }` → `weather`, `options` (ranked by arrival), `errors`.
+  - `GET /api/reverse?lat=&lon=` → short place name for a coordinate (GPS current location, via Nominatim reverse).
+  - `POST /api/commute` body `{ from: PlaceSpec, to: PlaceSpec, maxBikeMinutes?, travelMode?, start? }` → `weather`, `options` (ranked by arrival), `errors`. `travelMode` is `"auto"` (weather decides) | `"bike"` (force bike, hides walk-access options) | `"transit"` (no bike).
   - `GET /api/health`.
 - Route cards: header shows the route endpoints (`Home > BMW Garching`); the transport summary (`S1 > 292`) is secondary; transfer hubs get a `CHANGE` badge on the timeline.
 

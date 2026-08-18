@@ -1,5 +1,8 @@
 export type AccessMode = "walk" | "bike";
 
+/** How the planner treats the bike: weather decides, force bike, or no bike. */
+export type TravelMode = "auto" | "bike" | "transit";
+
 export interface WeatherHour {
   /** Berlin wall-clock "YYYY-MM-DDTHH:00" label. */
   time: string;
@@ -132,6 +135,8 @@ export interface CommuteRequest {
   to: PlaceSpec;
   /** Cap on biking minutes per option (user setting). */
   maxBikeMinutes?: number;
+  /** "auto" (weather decides) | "bike" (force bike) | "transit" (no bike). */
+  travelMode?: TravelMode;
   /** ISO start time; defaults to "now". */
   start?: string;
 }
@@ -144,6 +149,8 @@ export interface CommuteResponse {
   startTime: string | null;
   /** Cap on biking minutes per option (user setting). */
   maxBikeMinutes: number;
+  /** Mode the planner ran in ("auto" | "bike" | "transit"). */
+  travelMode: TravelMode;
   from: string;
   to: string;
   fromName: string;
